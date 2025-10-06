@@ -12,15 +12,11 @@ const path = require('path');
 const { count } = require('console');
 const dbPath = path.resolve(__dirname, 'database', 'database.db');
 const db = new sqlite3.Database('database/database.db');
-const http = require('http');
-const { Server } = require("socket.io");
-const server = http.createServer(app);
-const io = new Server(server);
 const bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({ extended: true })); 
 app.use(bodyParser.json());
 
-io. on('connection', (socket) => {
+io.on('connection', (socket) => {
 	console.log('A user connected');
 
     // Send the current quiz to newly connected students if the game is already started

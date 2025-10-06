@@ -15,96 +15,15 @@
         <div id="questions"></div>
     </div>
     <p id="waiting-message">Waiting for the teacher to start the game...</p>
-
     <script src="/socket.io/socket.io.js"></script>
+     <!-- Makes it so its waiting for the socket to emit to direct them to the quiz page to start -->
     <script>
         const socket = io();
-        
         socket.on('game-started', (data) => {
-            console.log('recieved game-started event with data:', data);
-            const quizContainer = document.getElementById('quiz-container');
-            const quizTitle = document.getElementById('quiz-title');
-            const questionsDiv = document.getElementById('questions');
-            const waitingMessage = document.getElementById('waiting-message');
-            //Displays quiz name
-            quizTitle.textContent = data.quiz.title;
-
-            // Display the quiz questions and answers
-            questionsDiv.innerHTML = '';
-            data.quiz.questions.forEach((question, index) => {
-                const questionElement = document.createElement('p');
-                questionElement.textContent = `${index + 1}. ${question}`;
-                questionsDiv.appendChild(questionElement);
-                
-                const answers = data.quiz.answers[index];
-                for (const [answer, isCorrect] of Object.entries(answers)) {
-                    const answerElement = document.createElement('div');
-                     answerElement.innerHTML = `
-                        <label>
-                            <input type="radio" name="q${index}" value="${answer}">
-                            ${answer}
-                        </label>
-                    `;
-            questionsDiv.appendChild(answerElement);
-        }
-    });
-
-    quizContainer.style.display = 'block';
-    waitingMessage.style.display = 'none';
-});
-
-socket.on('no-quiz', (data) => {
-    console.log(data.message);
-    const waitingMessage = document.getElementById('waiting-message');
-    waitingMessage.textContent = data.message;
-});
-    </script>
-</body>
-<script>
-    const socket = io();
-    let timer = null;
-
-    // Start countdown when server says so
-    socket.on('countdown-start', (data) => {
-        let remaining = Math.ceil((data.endTime - Date.now()) / 1000);
-        
-        timer = setInterval(() => {
-            document.getElementById('time').innerText = remaining;
-            remaining--;
-            if (remaining < 0) {
-                clearInterval(timer);
-            }
-        }, 1000);
-    });
-
-    // Sync countdown if joining late
-    socket.on('countdown:sync', (data) => {
-        let remaining = data.remaining;
-        
-        timer = setInterval(() => {
-            document.getElementById('time').innerText = remaining;
-            remaining--;
-            if (remaining < 0) {
-                clearInterval(timer);
-            }
-        }, 1000);
-    });
-
-    // Clear when done
-    socket.on('countdown-done', () => {
-        document.getElementById('time').innerText = '';
-        if (timer) clearInterval(timer);
-    });
-    
-        socket.on('next-question', () => {
-            alert('Next question!');
+            console.log('Game started:', data);
+            window.location.href = '/quiz';
         });
-
-    window.addEventListener('beforeunload', () => {
-        navigator.sendBeacon('/logout');
-    });
-</script>
-
+    </script>
 </body>
 
 </html>
