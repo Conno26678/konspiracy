@@ -180,8 +180,6 @@ io.on('connection', (socket) => {
 	});
 });
 
-app.use(express.urlencoded({ extended: true }));
-
 function isAuthenticated(req, res, next) {
 	if (req.session.user && req.session.user.classrooms) {
 		// Log all classrooms and their students
@@ -200,75 +198,8 @@ app.set('view engine', 'ejs');
 const activeUsers = new Set();
 
 //shared state for quiz data
-let currentQuiz = null;
+let currentQuiz = null;	
 
-
-
-app.post('/teacher', (req, res) => {
-	const selectedSubject = req.body.subject;
-
-	if (selectedSubject === 'sample_data') {
-		res.render('sample_test.ejs', { testName: 'Sample Data Test' });
-	} else {
-		res.status(400).send('Invalid subject selected');
-	}
-});
-
-app.post('/teacher/confirm', (req, res) => {
-    const selectedQuiz = req.body.selectedQuiz;
-    if (selectedQuiz) {
-        const quizzes = {
-            Colors: {
-                title: "Colors Quiz",
-                questions: [
-                    "What is the first color of the rainbow?",
-                    "What color is also the color of a fruit?",
-                    "What color is the sun?"
-                ],
-                answers: [
-                    { "Red": true, "Orange": false, "Purple": false, "Blue": false },
-                    { "Yellow": false, "Green": false, "Orange": true, "Violet": false },
-                    { "Red": false, "Yellow": true, "Pink": false, "Blue": false }
-                ]
-            },
-            Numbers: {
-                title: "Numbers Quiz",
-                questions: [
-                    "What is 6 + 7?",
-                    "What is 9 + 10?",
-                    "What is 6 + 9?"
-                ],
-                answers: [
-                    { "67": false, "14": false, "12": false, "13": true },
-                    { "21": false, "910": false, "19": true, "1": false },
-                    { "69": false, "15": true, "3": false, "16": false }
-                ]
-            },
-            Letters: {
-                title: "Letters Quiz",
-                questions: [
-                    "Which of these letters is a vowel?",
-                    "What is the 13th letter of the alphabet?",
-                    "Which letter does 'sea' sound like?"
-                ],
-                answers: [
-                    { "C": false, "B": false, "D": false, "A": true },
-                    { "L": false, "M": true, "N": false, "O": false },
-                    { "C": true, "B": false, "S": false, "V": false }
-                ]
-            }
-        };
-		// Store the full quiz data
-        currentQuiz = quizzes[selectedQuiz];
-		console.log('Current quiz:', currentQuiz);
-
-        io.emit('game-started', { quiz: currentQuiz });
-
-        res.redirect('/teacher');
-    } else {
-        res.status(400).send('No quiz selected');
-    }
-});
 app.get('/login', (req, res) => {
 	if (req.query.token) {
 		try {
