@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Review: <%= quiz.title %></title>
+    <style>
+        .correct { color: green; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <h1>Review: <%= quiz.title %></h1>
+    <h2>Question <%= questionNumber + 1 %> of <%= quiz.questions.length %></h2>
+
+    <% const q = quiz.questions[questionNumber]; %>
+    <p><strong><%= q.question %></strong></p>
+
+    <ul>
+        <% q.answers.forEach(a => { %>
+            <li class="<%= a.correct ? 'correct' : '' %>">
+                <%= a.answer %> <%= a.correct ? '(Correct)' : '' %>
+            </li>
+        <% }) %>
+    </ul>
+
+    <hr>
+    <% if (!isLast) { %>
+        <a href="/quiz?question=<%= questionNumber + 1 %>">Next Question</a>
+    <% } else { %>
+        <a href="/teacher">Finish</a>
+    <% } %>
+    <br><br>
+    <a href="/teacher">Back to Teacher Panel</a>
+</body>
+</html>
