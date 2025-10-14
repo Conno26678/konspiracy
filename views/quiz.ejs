@@ -4,17 +4,114 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title><%= quiz.title %> Quiz</title>
+    <style>
+        .hidden { display: none; }
+        #timer, #redirect-seconds { font-weight: bold; }
+    </style>
 </head>
 <body>
     <h1><%= quiz.title %> Quiz</h1>
     <h2>Question <%= questionNumber + 1 %> of <%= quiz.questions.length %></h2>
-    
+
     <% const currentQuestion = quiz.questions[questionNumber]; %>
-    <h3><%= currentQuestion.question %></h3>
-    <ul>
-        <% currentQuestion.answers.forEach((answer) => { %>
-            <li><%= answer.answer %></li>
-        <% }) %>
-    </ul>
+    <div id="question-block">
+        <h3><%= currentQuestion.question %></h3>
+    </div>
+
+    <!-- FIRST COUNTDOWN (reveal answers) -->
+    <div id="timer-wrapper">
+        Showing answers in <span id="timer"></span> <span id="timer-unit">seconds</span>...
+    </div>
+
+    <div id="answers-container" class="hidden">
+        <ul>
+            <% currentQuestion.answers.forEach(a => { %>
+                <li><%= a.answer %></li>
+            <% }) %>
+        </ul>
+    </div>
+
+    <!-- SECOND COUNTDOWN (redirect) -->
+    <div id="redirect-wrapper" class="hidden">
+        Question ends in <span id="redirect-seconds"></span> <span id="redirect-unit">seconds</span>
+    </div>
+
+    <div>
+        <% if (questionNumber > 0) { %>
+            <a href="/quiz?question=<%= questionNumber - 1 %>">Previous</a>
+        <% } %>
+        <% if (questionNumber < quiz.questions.length - 1) { %>
+            <a href="/quiz?question=<%= questionNumber + 1 %>">Next</a>
+        <% } %>
+    </div>
+    <br>
+    <a href="/teacher">Back to Teacher Panel</a>
+
+    <script>
+        // Durations
+        const REVEAL_COUNTDOWN_SECONDS = 5;      // first countdown (show answers)
+        const REDIRECT_COUNTDOWN_SECONDS = 15;   // second countdown (after answers shown)
+        const REDIRECT_URL = '/review';          // change to your review route
+
+        // Elements
+        const timerSpan = document.getElementById('timer');
+        const timerUnitSpan = document.getElementById('timer-unit');
+        const answersContainer = document.getElementById('answers-container');
+        const timerWrapper = document.getElementById('timer-wrapper');
+
+        const redirectWrapper = document.getElementById('redirect-wrapper');
+        const redirectSecondsSpan = document.getElementById('redirect-seconds');
+        const redirectUnitSpan = document.getElementById('redirect-unit');
+
+        const navLinks = document.querySelectorAll('.nav-link');
+
+        // Block nav until process finishes
+        navLinks.forEach(a => {
+            a.addEventListener('click', e => {
+                if (a.getAttribute('data-blocked') === 'true') e.preventDefault();
+            });
+        });
+
+        // FIRST COUNTDOWN
+        let revealRemaining = REVEAL_COUNTDOWN_SECONDS;
+        timerSpan.textContent = revealRemaining;
+        timerUnitSpan.textContent = revealRemaining === 1 ? 'second' : 'seconds';
+
+        const revealInterval = setInterval(() => {
+            revealRemaining--;
+            timerSpan.textContent = revealRemaining;
+            timerUnitSpan.textContent = revealRemaining === 1 ? 'second' : 'seconds';
+            if (revealRemaining <= 0) {
+                clearInterval(revealInterval);
+                revealAnswers();
+            }
+        }, 1000);
+
+        function revealAnswers() {
+            answersContainer.classList.remove('hidden');
+            timerWrapper.classList.add('hidden');
+            startRedirectCountdown();
+        }
+
+        // SECOND COUNTDOWN
+        function startRedirectCountdown() {
+            redirectWrapper.classList.remove('hidden');
+            let redirectRemaining = REDIRECT_COUNTDOWN_SECONDS;
+            redirectSecondsSpan.textContent = redirectRemaining;
+            redirectUnitSpan.textContent = redirectRemaining === 1 ? 'second' : 'seconds';
+
+            const redirectInterval = setInterval(() => {
+                redirectRemaining--;
+                redirectSecondsSpan.textContent = redirectRemaining;
+                redirectUnitSpan.textContent = redirectRemaining === 1 ? 'second' : 'seconds';
+                if (redirectRemaining <= 0) {
+                    clearInterval(redirectInterval);
+                    // Allow nav (optional)
+                    navLinks.forEach(a => a.removeAttribute('data-blocked'));
+                    window.location.href = REDIRECT_URL + '?question=<%= questionNumber %>';
+                }
+            }, 1000);
+        }
+    </script>
 </body>
 </html>

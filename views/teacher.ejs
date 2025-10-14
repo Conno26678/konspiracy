@@ -3,27 +3,17 @@
     
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Teacher Panel</title>
 </head>
 
 <body>
     <h1>Welcome Teacher</h1>
     <form id="quiz-form" method="POST" action="/teacher">
-        <label for="subject">Choose a subject for the test:</label>
-        <select id="subject" name="selectedQuiz">
-            <option value="Colors">Colors</option>
-            <option value="Numbers">Numbers</option>
-            <option value="Letters">Letters</option>
-        </select>
+        <label for="subject">Choose a quiz:</label>
+        <select id="subject" name="selectedQuiz"></select>
         <button type="button" id="view-quiz">View Quiz</button>
         <div id="time"></div>
-        <button style="display: none;" type="button" onclick="countdown()" id="ready-button">Ready</button>
-        <% students.forEach(student=> { %>
-            <ul>
-                <%= student %>
-            </ul>
-            <% }) %>
+        <button style="display:none;" type="button" onclick="countdown()" id="ready-button">Ready</button>
     </form>
     
     <div id="quiz-container" style="display: none;">
@@ -52,86 +42,63 @@
         </div>
     <script src="/socket.io/socket.io.js"></script>
     <script>
-        // Quiz data
-        const quizzes = {
-            Colors: {
-                title: "Colors Quiz",
-                questions: [
-                    "What is the first color of the rainbow?",
-                    "What color is also the color of a fruit?",
-                    "What color is the sun?"
-                ],
-                answers: [
-                    { "Red": true, "Orange": false, "Purple": false, "Blue": false },
-                    { "Yellow": false, "Green": false, "Orange": true, "Violet": false },
-                    { "Red": false, "Yellow": true, "Pink": false, "Blue": false }
-                ]
-            },
-            Numbers: {
-                title: "Numbers Quiz",
-                questions: [
-                    "What is 6 + 7?",
-                    "What is 9 + 10?",
-                    "What is 6 + 9?"
-                ],
-                answers: [
-                    { "67": false, "14": false, "12": false, "13": true },
-                    { "21": false, "910": false, "19": true, "1": false },
-                    { "69": false, "15": true, "3": false, "16": false }
-                ]
-            },
-            Letters: {
-                title: "Letters Quiz",
-                questions: [
-                    "Which of these letters is a vowel?",
-                    "What is the 13th letter of the alphabet?",
-                    "Which letter does 'sea' sound like?"
-                ],
-                answers: [
-                    { "C": false, "B": false, "D": false, "A": true },
-                    { "L": false, "M": true, "N": false, "O": false },
-                    { "C": true, "B": false, "S": false, "V": false }
-                ]
-            }
-        };
+        // Injected from server
+        const quizzes = <%- JSON.stringify(quizzes) %>;
 
-        const subjectDropdown = document.getElementById("subject");
-        const quizContainer = document.getElementById("quiz-container");
-        const quizTitle = document.getElementById("quiz-title");
-        const questionsDiv = document.getElementById("questions");
-        const viewQuizButton = document.getElementById("view-quiz");
-        const confirmQuizButton = document.getElementById("confirm-quiz");
-        const selectedQuizInput = document.getElementById("selectedQuiz");
+        const subjectDropdown = document.getElementById('subject');
+        const quizContainer = document.getElementById('quiz-container');
+        const quizTitle = document.getElementById('quiz-title');
+        const questionsDiv = document.getElementById('questions');
+        const viewQuizButton = document.getElementById('view-quiz');
 
-        viewQuizButton.addEventListener("click", function () {
-            document.getElementById("ready-button").style.display = "inline-block";
-            const selectedSubject = subjectDropdown.value;
+        // Populate dropdown
+        Object.keys(quizzes).forEach(name => {
+            const opt = document.createElement('option');
+            opt.value = name;
+            opt.textContent = quizzes[name].title || name;
+            subjectDropdown.appendChild(opt);
+        });
 
-            // Clear previous quiz
-            questionsDiv.innerHTML = "";
+        viewQuizButton.addEventListener('click', () => {
+            const selected = subjectDropdown.value;
+            questionsDiv.innerHTML = '';
+            const quiz = quizzes[selected];
+            if (!quiz) return;
 
-            // Display the selected quiz
-            if (quizzes[selectedSubject]) {
-                const quiz = quizzes[selectedSubject];
-                quizTitle.textContent = quiz.title;
+            quizTitle.textContent = quiz.title;
+            quiz.questions.forEach((qText, idx) => {
+                const p = document.createElement('p');
+                p.textContent = (idx + 1) + '. ' + qText;
+                questionsDiv.appendChild(p);
 
-                quiz.questions.forEach((question, index) => {
-                    const questionElement = document.createElement("p");
-                    questionElement.textContent = `${index + 1}. ${question}`;
-                    questionsDiv.appendChild(questionElement);
-
-                    const answers = quiz.answers[index];
-                    for (const [answer, isCorrect] of Object.entries(answers)) {
-                        const answerElement = document.createElement("div");
-                        answerElement.innerHTML = `
-                            <label>
-                                <input type="radio" name="q${index}" value="${answer}" disabled>
-                                ${answer}
-                            </label>
-                        `;
-                        questionsDiv.appendChild(answerElement);
-                    }
+                const ansObj = quiz.answers[idx];
+                Object.entries(ansObj).forEach(([answerText, isCorrect]) => {
+                    const div = document.createElement('div');
+                    div.innerHTML = `
+                        <label>
+                            <input type="radio" name="q${idx}" value="${answerText}" disabled>
+                            ${answerText}
+                        </label>
+                    `;
+                    questionsDiv.appendChild(div);
                 });
+            });
+            quizContainer.style.display = 'block';
+            document.getElementById('ready-button').style.display = 'inline-block';
+        });
+
+        function countdown() {
+            let t = 5;
+            const timeDiv = document.getElementById('time');
+            const intId = setInterval(() => {
+                timeDiv.textContent = t;
+                t--;
+                if (t < 0) {
+                    clearInterval(intId);
+                    document.getElementById('quiz-form').submit();
+                }
+            }, 1000);
+        }
 
                 quizContainer.style.display = "block";
                 

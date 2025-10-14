@@ -28,3 +28,71 @@ Load new page per question but have each page share the same format
 
     Another issue I had is that the quiz that gets chosen on ready is related to the SQL. 
     How do I make that so it corresponds with what quiz is chosen
+
+    Hardcoded Quiz Data:
+    // const quizzes = {
+        //     Colors: {
+        //         title: "Colors Quiz",
+        //         questions: [
+        //             "What is the first color of the rainbow?",
+        //             "What color is also the color of a fruit?",
+        //             "What color is the sun?"
+        //         ],
+        //         answers: [
+        //             { "Red": true, "Orange": false, "Purple": false, "Blue": false },
+        //             { "Yellow": false, "Green": false, "Orange": true, "Violet": false },
+        //             { "Red": false, "Yellow": true, "Pink": false, "Blue": false }
+        //         ]
+        //     },
+        //     Numbers: {
+        //         title: "Numbers Quiz",
+        //         questions: [
+        //             "What is 6 + 7?",
+        //             "What is 9 + 10?",
+        //             "What is 6 + 9?"
+        //         ],
+        //         answers: [
+        //             { "67": false, "14": false, "12": false, "13": true },
+        //             { "21": false, "910": false, "19": true, "1": false },
+        //             { "69": false, "15": true, "3": false, "16": false }
+        //         ]
+        //     },
+        //     Letters: {
+        //         title: "Letters Quiz",
+        //         questions: [
+        //             "Which of these letters is a vowel?",
+        //             "What is the 13th letter of the alphabet?",
+        //             "Which letter does 'sea' sound like?"
+        //         ],
+        //         answers: [
+        //             { "C": false, "B": false, "D": false, "A": true },
+        //             { "L": false, "M": true, "N": false, "O": false },
+        //             { "C": true, "B": false, "S": false, "V": false }
+        //         ]
+        //     }
+        // };
+
+
+//Needs to make permissions, and make like one page for both students and the teacher
+//Teachers can skip questions,
+//And students can actually answer them (clickable buttons)
+
+viewQuizButton.addEventListener("click", function () {
+    doucment.getElementById("ready-button").style.display = "inline-block";
+    const selectedSubject = subjectDropdown.value;
+
+    //Clear previous quiz
+    questionsDiv.innerHTML = "";
+
+    //Display the selected quiz
+    if (quizzes[selectedSubject]) {
+        const quiz = quizzes[selectedSubject];
+        quizTitle.textContent = quiz.title;
+
+        quiz.questions.forEach((question, index) => {
+            const questionElement = document.createElement("p");
+            questionElement.textContent = `${index + 1}. ${question}`;
+            questionsDiv.appendChild(questionElement);
+        })
+    }
+})
