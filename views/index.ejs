@@ -39,7 +39,7 @@
                 const answers = data.quiz.answers[index];
                 for (const [answer, isCorrect] of Object.entries(answers)) {
                     const answerElement = document.createElement('div');
-                     answerElement.innerHTML = `
+                    answerElement.innerHTML = `
                         <label>
                             <input type="radio" name="q${index}" value="${answer}">
                             ${answer}
@@ -61,7 +61,6 @@ socket.on('no-quiz', (data) => {
     </script>
 </body>
 <script>
-    const socket = io();
     let timer = null;
 
     // Start countdown when server says so

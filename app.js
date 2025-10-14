@@ -5,22 +5,122 @@ const session = require('express-session');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const app = express();
-const server = createServer(app);
-const io = new Server(server);
 const sqlite3 = require('sqlite3');
 const path = require('path');
 const { count } = require('console');
 const dbPath = path.resolve(__dirname, 'database', 'database.db');
 const db = new sqlite3.Database('database/database.db');
 const http = require('http');
-const { Server } = require("socket.io");
 const server = http.createServer(app);
 const io = new Server(server);
 const bodyParser = require('body-parser');
 app.use(bodyParser.urlencoded({ extended: true })); 
 app.use(bodyParser.json());
 
-io. on('connection', (socket) => {
+const gameStates = {
+	lobby: 'lobby',
+	countdown: 'countdown',
+	gettingAnswers: 'gettingAnswers',
+	review: 'review',
+	gameOver: 'gameOver'
+};
+
+// Fix the Game constructor
+class Game {
+    constructor(teacherId, quiz) {  // Add missing parameters
+        this.id = `game-${Date.now()}_${teacherId}`;
+        this.teacherId = teacherId;
+        this.quiz = quiz;
+        this.state = gameStates.lobby;
+        this.currentQuestionIndex = 0;
+        this.playerAnswers = new Map();
+        this.createdAt = Date.now();
+        this.students = new Set();
+        this.countdownEndTime = null;
+        this.questionStartTime = null;
+    }
+	
+	currentQuestion() {
+		if (this.currentQuestionIndex < this.quiz.questions.length) {
+			return this.quiz.questions[this.currentQuestionIndex];
+		}
+		return null;
+	};
+	
+	nextQuestion() {
+		this.currentQuestionIndex++;
+		this.playerAnswers.clear();
+		
+		if (this.currentQuestionIndex >= this.quiz.questions.length) {
+			this.state = gameStates.gameOver;
+		} else {
+			this.state = gameStates.countdown;
+		}};
+		
+	addStudent(studentId) {
+		this.students.add(studentId);
+	};
+
+	removeStudent(studentId) {
+		this.students.delete(studentId);
+		this.playerAnswers.delete(studentId);
+	}
+
+	getGameStateData() {
+        return {
+            gameId: this.id,
+            state: this.state,
+            quiz: {
+                title: this.quiz.title,
+                totalQuestions: this.quiz.questions.length
+            },
+            currentQuestionIndex: this.currentQuestionIndex,
+            currentQuestion: this.currentQuestion(),
+            countdownEndTime: this.countdownEndTime,
+            studentsConnected: this.students.size,
+            answersReceived: this.playerAnswers.size
+        };
+    }
+	};
+
+const activeGames = new Map(); // gameId -> Game instance
+
+function teacherGames(teacherId) {
+	return activeGames.get(teacherId);
+}
+
+function findGame(studentId, teacherClassrooms) {
+    // First check if student is already in an active game
+    for (const [teacherId, game] of activeGames.entries()) {
+        if (game.students.has(studentId)) {
+            return game;
+        }
+    }
+    
+    // If not in a game, check if student belongs to any teacher with active games
+    for (const [teacherId, game] of activeGames.entries()) {
+        const hasStudent = teacherClassrooms && teacherClassrooms.some(classroom => 
+            classroom.students.some(student => student.studentId === studentId)
+        );
+        if (hasStudent) {
+            game.addStudent(studentId);
+            return game;
+        }
+    }
+    return null;
+}
+
+function cleanUpGameEnd() {
+	for (const [teacherId, game] of activeGames.entries()) {
+		if (game.state === gameStates.gameOver) {
+			activeGames.delete(teacherId)
+		}
+	}
+}
+
+
+
+io.on('connection', (socket) => {
 	console.log('A user connected');
 
     // Send the current quiz to newly connected students if the game is already started
@@ -105,6 +205,35 @@ let countdownEndTime = null;
 io.on('connection', (socket) => {
 	console.log(`${socket.userRole} connected`);
 
+	if (socket.userRole === 'teacher') {
+		const game = teacherGames(socket.userId);
+		if(game) {
+			socket.emit('game-state', game.getGameStateData());
+		}
+	} else if (socket.userRole === 'student') {
+		const studentClassrooms = socket.request.session.user.classrooms || [];
+		const game = findGame(socket.userId, studentClassrooms);
+		if (game) {
+			socket.emit('game-state', game.getGameStateData());
+		}
+	}
+
+	socket.on('start-game', (quizData) => {
+		if (socket.userRole === 'teacher') {
+			const game = new Game(socket.userId, quizData);
+			activeGames.set(socket.userId, game);
+
+			const teacherClassrooms = socket.request.session.user.classrooms;
+			const studentIds = studentsInClass(teacherClassrooms);
+			studentIds.forEach(studentId => game.addStudent(studentId));
+
+			socket.emit('game-state', game.getGameStateData());
+			emitToClass(socket, 'game-state', game.getGameStateData());
+
+			console.log(`Game started by teacher ${socket.userId}`);
+		}
+	});
+
 	// If countdown is active, tell new user the remaining time (only if they're in the right class)
 	if (countdownActive && countdownEndTime) {
 		const remaining = Math.ceil((countdownEndTime - Date.now()) / 1000);
@@ -126,29 +255,82 @@ io.on('connection', (socket) => {
 		}
 	}
 
-	// Handle teacher starting countdown - only affect their students
-	socket.on('start-countdown', () => {
-		if (socket.userRole === 'teacher' && !countdownActive) {
-			countdownActive = true;
-			countdownEndTime = Date.now() + 5000; // 5 seconds
+// Handle teacher starting countdown
+    socket.on('start-countdown', () => {
+        if (socket.userRole === 'teacher') {
+            const game = teacherGames(socket.userId);  // Use correct function name
+            if (game && game.state === gameStates.lobby) {
+                game.state = gameStates.countdown;
+                game.countdownEndTime = Date.now() + 5000; // 5 seconds
 
-			// Tell the teacher
-			socket.emit('countdown-start', { endTime: countdownEndTime });
-			
-			// Tell only students in this teacher's classes
-			emitToClass(socket, 'countdown-start', { endTime: countdownEndTime });
+                const gameStateData = game.getGameStateData();
+                socket.emit('game-state', gameStateData);
+                emitToClass(socket, 'game-state', gameStateData);
 
-			// Stop countdown after 5 seconds
-			setTimeout(() => {
-				countdownActive = false;
-				countdownEndTime = null;
-				
-				// Tell the teacher
-				socket.emit('countdown-done');
-				
-				// Tell only students in this teacher's classes
-				emitToClass(socket, 'countdown-done');
-			}, 6000);
+                // After countdown, move to getting answers
+                setTimeout(() => {
+                    game.state = gameStates.gettingAnswers;
+                    game.questionStartTime = Date.now();
+                    game.countdownEndTime = null;
+                    
+                    const updatedStateData = game.getGameStateData();
+                    socket.emit('game-state', updatedStateData);
+                    emitToClass(socket, 'game-state', updatedStateData);
+                }, 6000);
+            }
+        }
+    });
+
+	socket.on('submit-answer', (answer) => {
+		if (socket.userRole === 'student') {
+			// Get student's classroom data from session or database
+			const studentClassrooms = socket.request.session.user.classrooms || [];
+			const game = findGame(socket.userId, studentClassrooms);
+
+			if (game && game.state === gameStates.gettingAnswers) {
+				game.playerAnswers.set(socket.userId, answer);
+
+				if (game.playerAnswers.size === game.students.size) {
+					game.state = gameStates.review;
+
+					// Find teacher socket and notify
+					io.sockets.sockets.forEach(teacherSocket => {
+						if (teacherSocket.userRole === 'teacher' && teacherSocket.userId === game.teacherId) {
+							teacherSocket.emit('answers-received');
+							teacherSocket.emit('game-state', game.getGameStateData());
+						}
+					});
+				}
+			}
+		}
+	});
+
+	socket.on('next-question', () => {
+		if (socket.userRole === 'teacher') {
+			const game = teacherGames(socket.userId);
+			if (game && game.state === gameStates.review) {
+				game.nextQuestion();
+
+				const gameStateData = game.getGameStateData();
+				socket.emit('game-state', gameStateData);
+			}
+		}
+	});
+
+	socket.on('end-game', () => {
+		if (socket.userRole === 'teacher') {
+			const game = teacherGames(socket.userId);
+			if (game) {
+				game.state = gameStates.gameOver;
+
+				const gameStateData = game.getGameStateData();
+				socket.emit('game-state', gameStateData);
+				emitToClass(socket, 'game-state', gameStateData);
+
+				setTimeout(() => {
+					activeGames.delete(socket.userId);
+				}, 10000);
+			}
 		}
 	});
 
@@ -172,6 +354,11 @@ io.on('connection', (socket) => {
 		console.log(`${socket.userRole} disconnected`);
 
 		if (socket.userRole === 'student') {
+
+		for (const game of activeGames.values()) {
+			game.removeStudent(socket.userId);
+		}
+
 			activeUsers.delete(socket.userId);
 
 			io.sockets.sockets.forEach(teacherSocket => {
@@ -180,6 +367,12 @@ io.on('connection', (socket) => {
 					teacherSocket.emit('update-students', activeStudents);
 				}
 			});
+		} else if (socket.userRole === 'teacher') {
+			const game = teacherGames(socket.userId);
+			if (game) {
+				game.state = gameStates.gameOver;
+				emitToClass(socket, 'game-state', {reason: 'Teacher disconnected, game ended.'});
+			}
 		}
 	});
 });
@@ -262,13 +455,18 @@ app.post('/teacher/confirm', (req, res) => {
                 ]
             }
         };
-		// Store the full quiz data
-        currentQuiz = quizzes[selectedQuiz];
-		console.log('Current quiz:', currentQuiz);
 
-        io.emit('game-started', { quiz: currentQuiz });
-
-        res.redirect('/teacher');
+        const quizData = quizzes[selectedQuiz];
+        if (quizData) {
+            // Create new game instead of just setting currentQuiz
+            const game = new Game(req.session.user.id, quizData);
+            activeGames.set(req.session.user.id, game);
+            
+            console.log(`Game created for teacher ${req.session.user.id}`);
+            res.redirect('/teacher');
+        } else {
+            res.status(400).send('Quiz not found');
+        }
     } else {
         res.status(400).send('No quiz selected');
     }
@@ -337,29 +535,20 @@ app.get('/', isAuthenticated, (req, res) => {
 });
 
 app.get('/teacher', isAuthenticated, (req, res) => {
-	try {
-		// io.on('connenction', () => {
-
-		// Aggregate all students from all classrooms
-		const allStudents = req.session.user.classrooms
-			? req.session.user.classrooms.flatMap(classroom => classroom.students)
-			: [];
-
-		// Filter students who are currently signed in
-		const activeStudents = allStudents
-			.filter(student => activeUsers.has(student.studentId))
-			.map(student => student.displayName);
-
-		// Remove duplicates by creating a Set
-		const uniqueActiveStudents = [...new Set(activeStudents)];
-
-		// Render the teacher panel with the unique list of active students
-		res.render('teacher.ejs', { students: uniqueActiveStudents });
-		// });
-	} catch (error) {
-		console.log(error.message);
-		res.status(500).send('An error occurred while loading the teacher page.');
-	}
+    try {
+        const activeStudents = getActiveStudents(req.session.user.classrooms);
+        
+        // Check if teacher has an active game
+        const activeGame = teacherGames(req.session.user.id);
+        
+        res.render('teacher.ejs', { 
+            students: activeStudents,
+            activeGame: activeGame ? activeGame.getGameStateData() : null
+        });
+    } catch (error) {
+        console.log(error.message);
+        res.status(500).send('An error occurred while loading the teacher page.');
+    }
 });
 
 app.post('/teacher', isAuthenticated, (req, res) => {

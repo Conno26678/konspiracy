@@ -9,7 +9,6 @@
 
 <body>
     <h1>Welcome Teacher</h1>
-    <div id="time"></div>
     <form id="quiz-form" method="POST" action="/teacher">
         <label for="subject">Choose a subject for the test:</label>
         <select id="subject" name="selectedQuiz">
@@ -32,7 +31,7 @@
         <div id="questions"></div>
     </div>
     
-    <button id="ready">Ready</button>
+    <button id="ready">Start</button>
     <div>
         <h3>Active Students in Your Classes:</h3>
         <ul id="students">
@@ -44,6 +43,13 @@
             </ul>
         </div>
         
+        <!-- Add this to teacher.ejs -->
+        <div id="game-status-panel" style="border: 1px solid #ccc; padding: 15px; margin: 10px;">
+            <h3>Game Status</h3>
+            <p id="game-status">No Active Game</p>
+            <p>Question: <span id="current-question">-</span></p>
+            <p>Answers Received: <span id="answers-count">0</span>/<span id="total-students">0</span></p>
+        </div>
     <script src="/socket.io/socket.io.js"></script>
     <script>
         // Quiz data
@@ -94,8 +100,8 @@
         const quizTitle = document.getElementById("quiz-title");
         const questionsDiv = document.getElementById("questions");
         const viewQuizButton = document.getElementById("view-quiz");
-        // const confirmQuizButton = document.getElementById("confirm-quiz");
-        // const selectedQuizInput = document.getElementById("selectedQuiz");
+        const confirmQuizButton = document.getElementById("confirm-quiz");
+        const selectedQuizInput = document.getElementById("selectedQuiz");
 
         viewQuizButton.addEventListener("click", function () {
             document.getElementById("ready-button").style.display = "inline-block";
@@ -128,9 +134,9 @@
                 });
 
                 quizContainer.style.display = "block";
-                confirmQuizButton.style.display = "inline-block";
-
-                selectedQuizInput.value = selectedSubject;
+                
+                // Update the ready button text to be more clear
+                document.getElementById('ready').textContent = `Start ${quiz.title}`;
             }
         });
 
@@ -139,7 +145,22 @@
 
         // Button click - send to server
         document.getElementById('ready').onclick = () => {
-            socket.emit('start-countdown');
+            // Get selected quiz from dropdown
+            const selectedSubject = document.getElementById('subject').value;
+            const selectedQuiz = quizzes[selectedSubject];
+            
+            if (selectedQuiz) {
+                console.log('Starting game with quiz:', selectedQuiz);
+                // First start the game with quiz data
+                socket.emit('start-game', selectedQuiz);
+                
+                // Then start the countdown
+                setTimeout(() => {
+                    socket.emit('start-countdown');
+                }, 1000); // Small delay to ensure game is created first
+            } else {
+                alert('Please select a quiz first!');
+            }
         };
 
         // Start countdown when server says so
@@ -186,16 +207,65 @@
                 studentList.appendChild(li);
             });
         });
+
+        // Handle game state updates
+        socket.on('game-state', (gameData) => {
+            console.log('Game state received:', gameData);
+            
+            // Update game status panel
+            const gameStatus = document.getElementById('game-status');
+            const currentQuestion = document.getElementById('current-question');
+            const answersCount = document.getElementById('answers-count');
+            const totalStudents = document.getElementById('total-students');
+            
+            // Update UI based on game state
+            switch(gameData.state) {
+                case 'lobby':
+                    gameStatus.textContent = `Game "${gameData.quiz.title}" Ready - Click Start`;
+                    currentQuestion.textContent = 'Waiting to start';
+                    break;
+                case 'countdown':
+                    gameStatus.textContent = 'Countdown Active';
+                    currentQuestion.textContent = `Question ${gameData.currentQuestionIndex + 1}`;
+                    break;
+                case 'gettingAnswers':
+                    gameStatus.textContent = 'Students Answering';
+                    currentQuestion.textContent = gameData.currentQuestion || 'Loading...';
+                    break;
+                case 'review':
+                    gameStatus.textContent = 'Review Answers';
+                    break;
+                case 'gameOver':
+                    gameStatus.textContent = 'Game Ended';
+                    break;
+            }
+            
+            answersCount.textContent = gameData.answersReceived;
+            totalStudents.textContent = gameData.studentsConnected;
+        });
+
+        // Handle errors
+        socket.on('error', (data) => {
+            console.error('Socket error:', data.message);
+            alert('Error: ' + data.message);
+            document.getElementById('game-status').textContent = 'Error: ' + data.message;
+        });
+
+        // Handle when all answers are received
+        socket.on('answers-received', () => {
+            alert('All students have answered! You can now review answers or go to the next question.');
+            
+            // Show next question button
+            const nextBtn = document.createElement('button');
+            nextBtn.textContent = 'Next Question';
+            nextBtn.onclick = () => {
+                socket.emit('next-question');
+                nextBtn.remove(); // Remove button after clicking
+            };
+            document.getElementById('game-status-panel').appendChild(nextBtn);
+        });
     </script>
-    <div id="time"></div>
-    <button onclick="countdown()">Ready</button>
-    <% students.forEach(student=> { %>
-        <ul>
-            <%= student %>
-        </ul>
-        <% }) %>
-        <!-- directs to user page just for testing -->
-        <button onclick="location.href='/'">user page</button>
+
 </body>
 
 <script>
