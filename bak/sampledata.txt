@@ -1,0 +1,82 @@
+<form action="/teacher" method="POST">
+    <input type="hidden" name="name" value="" id="name">
+    <input type="hidden" name="score" value="" id="score">
+    <button id="button" style="display: none">Add your score</button>
+</form>
+<!-- Sample data -->
+ <script>
+    let users = [];
+    let quizNames = ["Colors", "Addition", "Letters"];
+    let colorsQuizQuestions = [
+        "What is the first color of the rainbow?",
+        "What color is also the color of a fruit?",
+        "What color is the sun?"
+    ]
+
+    let colorsAns1 = {}
+    colorsAns1["Red"] = true;
+    colorsAns1["Orange"] = false;
+    colorsAns1["Purple"] = false;
+    colorsAns1["Blue"] = false;
+
+    let colorsAns2 = {}
+    colorsAns2["Yellow"] = false;
+    colorsAns2["Green"] = false;
+    colorsAns2["Orange"] = true;
+    colorsAns2["Violet"] = false;
+
+    let colorsAns3 = {}
+    colorsAns3["Red"] = false;
+    colorsAns3["Yellow"] = true;
+    colorsAns3["Pink"] = false;
+    colorsAns3["Blue"] = false;
+
+    let numbersQuizQuestions = [
+        "What is 6 + 7?",
+        "What is 9 + 10?",
+        "What is 6 + 9?"
+    ]
+
+    let numbersAns1 = {}
+    numbersAns1["67"] = false;
+    numbersAns1["14"] = false;
+    numbersAns1["12"] = false;
+    numbersAns1["13"] = true;
+
+    let numbersAns2= {}
+    numbersAns2["21"] = false;
+    numbersAns2["910"] = false;
+    numbersAns2["19"] = true;
+    numbersAns2["1"] = false;
+
+    let numbersAns3 = {}
+    numbersAns3["69"] = false;
+    numbersAns3["15"] = true;
+    numbersAns3["3"] = false;
+    numbersAns3["16"] = false;
+
+    let lettersQuizQuestions = [
+        "Which of these letters is a vowel?",
+        "What is the 13th letter of the alphabet?",
+        "Which letter does \"sea\" sound like?"
+    ]
+
+    let letAns1 = {}
+    letAns1["C"] = false;
+    letAns1["B"] = false;
+    letAns1["D"] = false;
+    letAns1["A"] = true;
+
+    let letAns2 = {}
+    letAns2["L"] = false;
+    letAns2["M"] = true;
+    letAns2["N"] = false;
+    letAns2["O"] = false;
+
+    let letAns3 = {}
+    letAns3["C"] = true;
+    letAns3["B"] = false;
+    letAns3["S"] = false;
+    letAns3["V"] = false;
+
+ </script>

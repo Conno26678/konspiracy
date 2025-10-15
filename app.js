@@ -462,8 +462,6 @@ app.get('/', isAuthenticated, (req, res) => {
 
 app.get('/teacher', isAuthenticated, (req, res) => {
 	try {
-		// io.on('connenction', () => {
-
 		// Aggregate all students from all classrooms
 		const allStudents = req.session.user.classrooms
 			? req.session.user.classrooms.flatMap(classroom => classroom.students)
@@ -477,70 +475,61 @@ app.get('/teacher', isAuthenticated, (req, res) => {
 		// Remove duplicates by creating a Set
 		const uniqueActiveStudents = [...new Set(activeStudents)];
 
-        // Load quizzes + questions + answers
-        const sql = `
-            SELECT 
-                q.uid            AS quizUid,
-                q.quizname       AS quizname,
-                qq.uid           AS questionId,
-                qq.questions     AS questionText,
-                qa.answers       AS answerText,
-                qa.correct       AS correct
-            FROM quizzes q
-            INNER JOIN quizquestions qq ON q.uid = qq.quizid
-            INNER JOIN questionanswers qa ON qq.uid = qa.questionid
-            ORDER BY q.quizname, qq.uid, qa.rowid
-        `;
-        db.all(sql, [], (err, rows) => {
-            if (err) {
-                console.error('DB error loading quizzes', err);
-                return res.status(500).send('Database error');
-            }
-            const quizzes = {};
-            // Structure to match existing front-end (questions array + parallel answers array)
-            rows.forEach(r => {
-                if (!quizzes[r.quizname]) {
-                    quizzes[r.quizname] = {
-                        title: r.quizname,
-                        questions: [],
-                        answers: [],
-                        _qIndex: {} // temp: questionId -> index
-                    };
-                }
-                const qObj = quizzes[r.quizname];
-                if (qObj._qIndex[r.questionId] === undefined) {
-                    qObj._qIndex[r.questionId] = qObj.questions.length;
-                    qObj.questions.push(r.questionText);
-                    qObj.answers.push({}); // placeholder object mapping answer -> bool
-                }
-                const qi = qObj._qIndex[r.questionId];
-                qObj.answers[qi][r.answerText] = !!r.correct;
-            });
-            // Cleanup temp
-            Object.values(quizzes).forEach(q => delete q._qIndex);
+		// Load quizzes + questions + answers
+		const sql = `
+			SELECT 
+				q.uid            AS quizUid,
+				q.quizname       AS quizname,
+				qq.uid           AS questionId,
+				qq.questions     AS questionText,
+				qa.answers       AS answerText,
+				qa.correct       AS correct
+			FROM quizzes q
+			INNER JOIN quizquestions qq ON q.uid = qq.quizid
+			INNER JOIN questionanswers qa ON qq.uid = qa.questionid
+			ORDER BY q.quizname, qq.uid, qa.rowid
+		`;
+		db.all(sql, [], (err, rows) => {
+			if (err) {
+				console.error('DB error loading quizzes', err);
+				return res.status(500).send('Database error');
+			}
+			const quizzes = {};
+			// Structure to match existing front-end (questions array + parallel answers array)
+			rows.forEach(r => {
+				if (!quizzes[r.quizname]) {
+					quizzes[r.quizname] = {
+						title: r.quizname,
+						questions: [],
+						answers: [],
+						_qIndex: {} // temp: questionId -> index
+					};
+				}
+				const qObj = quizzes[r.quizname];
+				if (qObj._qIndex[r.questionId] === undefined) {
+					qObj._qIndex[r.questionId] = qObj.questions.length;
+					qObj.questions.push(r.questionText);
+					qObj.answers.push({}); // placeholder object mapping answer -> bool
+				}
+				const qi = qObj._qIndex[r.questionId];
+				qObj.answers[qi][r.answerText] = !!r.correct;
+			});
+			// Cleanup temp
+			Object.values(quizzes).forEach(q => delete q._qIndex);
 
-            res.render('teacher.ejs', {
-                students: uniqueActiveStudents,
-                quizzes
-            });
-        });
-    } catch (e) {
-        console.error(e);
-        res.status(500).send('Error loading teacher page.');
-    try {
-        const activeStudents = getActiveStudents(req.session.user.classrooms);
-        
-        // Check if teacher has an active game
-        const activeGame = teacherGames(req.session.user.id);
-        
-        res.render('teacher.ejs', { 
-            students: activeStudents,
-            activeGame: activeGame ? activeGame.getGameStateData() : null
-        });
-    } catch (error) {
-        console.log(error.message);
-        res.status(500).send('An error occurred while loading the teacher page.');
-    }
+			// Check if teacher has an active game
+			const activeGame = teacherGames(req.session.user.id);
+
+			res.render('teacher.ejs', {
+				students: uniqueActiveStudents,
+				quizzes,
+				activeGame: activeGame ? activeGame.getGameStateData() : null
+			});
+		});
+	} catch (error) {
+		console.error(error);
+		res.status(500).send('An error occurred while loading the teacher page.');
+	}
 });
 
 app.post('/teacher', isAuthenticated, (req, res) => {
@@ -612,7 +601,9 @@ app.get('/quiz', isAuthenticated, (req, res) => {
         const safeIndex = Math.max(0, Math.min(questionIndex, quiz.questions.length - 1));
         res.render('quiz.ejs', {
             quiz,
-            questionNumber: safeIndex
+            questionNumber: safeIndex,
+            isTeacher: req.session.user.permissions === 5,
+            userName: req.session.user.displayName
         });
     });
 });
